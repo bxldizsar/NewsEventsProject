@@ -10,4 +10,19 @@
         <maven.compiler.release>21</maven.compiler.release>
         <exec.mainClass>ro.umfst.app.Main</exec.mainClass>
     </properties>
+        <dependencies>
+        <!-- JDBC driver for SQLite -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.49.1.0</version>
+        </dependency>
+
+        <!-- JSON parser used for reading rss.json -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.13.1</version>
+        </dependency>
+    </dependencies>
 </project>
