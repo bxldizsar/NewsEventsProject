@@ -3,7 +3,7 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
 package ro.umfst.app.model;
-import java.sql.Timestamp
+import java.sql.Timestamp;
 /**
  *
  * @author boldi
