@@ -156,10 +156,12 @@ public class SQLiteNewsRepository implements NewsRepository {
     }
 
     @Override
-    public boolean delete(String source, String url) {
+    public boolean delete(String source, String url) 
+    {
         String query = "DELETE FROM news WHERE source = ? AND url = ?";
 
-        try (PreparedStatement statement = connection.prepareStatement(query)) {
+        try (PreparedStatement statement = connection.prepareStatement(query)) 
+        {
             statement.setString(1, source);
             statement.setString(2, url);
 
@@ -169,6 +171,42 @@ public class SQLiteNewsRepository implements NewsRepository {
         {
             throw new RuntimeException("Could not delete news: " + hiba.getMessage(), hiba);
         }
+    }
+    @Override
+    public List<News> search(String text) 
+    {
+        String query = """
+                SELECT * FROM news
+                WHERE title LIKE ? OR description LIKE ?
+                ORDER BY publish_date DESC
+                """;
+
+        String searchText = "";
+        if (text != null) 
+        {
+            searchText = text.trim();
+        }
+        // % means "any characters", so %dog% matches every text that contains "dog"
+        String pattern = "%" + searchText + "%";
+
+        List<News> result = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(query)) 
+        {
+            statement.setString(1, pattern);
+            statement.setString(2, pattern);
+
+            try (ResultSet rows = statement.executeQuery()) 
+            {
+                while (rows.next()) 
+                {
+                    result.add(readNews(rows));
+                }
+            }
+        } catch (SQLException hiba) 
+        {
+            throw new RuntimeException("Could not search news: " + hiba.getMessage(), hiba);
+        }
+        return result;
     }
     }
 

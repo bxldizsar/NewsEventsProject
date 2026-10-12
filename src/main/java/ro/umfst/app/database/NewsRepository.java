@@ -23,4 +23,7 @@ public interface NewsRepository {
 
     // Deletes the news item with the given key; returns false if there was nothing to delete
     boolean delete(String source, String url);
+    
+    // Returns the news items whose title or description contains the given text
+    List<News> search(String text);
 }
