@@ -135,7 +135,8 @@ public class SQLiteNewsRepository implements NewsRepository {
                 WHERE source = ? AND url = ?
                 """;
 
-        try (PreparedStatement statement = connection.prepareStatement(query)) {
+        try (PreparedStatement statement = connection.prepareStatement(query)) 
+        {
             statement.setString(1, news.getTitle());
             statement.setString(2, news.getDescription());
             statement.setString(3, news.getAuthor());
@@ -148,8 +149,9 @@ public class SQLiteNewsRepository implements NewsRepository {
 
             int changedRows = statement.executeUpdate();
             return changedRows == 1;
-        } catch (SQLException e) {
-            throw new RuntimeException("Could not update news: " + e.getMessage(), e);
+        } catch (SQLException hiba) 
+        {
+            throw new RuntimeException("Could not update news: " + hiba.getMessage(), hiba);
         }
     }
 
@@ -163,8 +165,9 @@ public class SQLiteNewsRepository implements NewsRepository {
 
             int deletedRows = statement.executeUpdate();
             return deletedRows == 1;
-        } catch (SQLException e) {
-            throw new RuntimeException("Could not delete news: " + e.getMessage(), e);
+        } catch (SQLException hiba) 
+        {
+            throw new RuntimeException("Could not delete news: " + hiba.getMessage(), hiba);
         }
     }
     }
