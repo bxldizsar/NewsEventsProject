@@ -26,4 +26,6 @@ public interface NewsRepository {
     
     // Returns the news items whose title or description contains the given text
     List<News> search(String text);
+    // Deletes every news item; returns how many were deleted
+    int deleteAll();
 }

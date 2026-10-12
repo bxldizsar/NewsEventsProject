@@ -10,22 +10,31 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingWorker;
 import ro.umfst.app.model.News;
+import ro.umfst.app.rss.RssSource;
+import ro.umfst.app.rss.RssSourceLoader;
 import ro.umfst.app.service.NewsService;
+import ro.umfst.app.service.RssImporter;
 
 // The main window: search bar on top, list on the left, details on the right, buttons at the bottom
 public class MainWindow extends JFrame 
 {
 
-    // The window only talks to the service, never to the database directly
-    private final NewsService newsService;
+    private static final String RSS_CONFIG = "res/rss.json";
 
-    // The controls are fields, so later steps can react to them
+    // The window only talks to the services, never to the database directly
+    private final NewsService newsService;
+    private final RssImporter rssImporter;
+
+    // The controls are fields, so the methods below can react to them
     private final JTextField searchField = new JTextField(30);
+    private final JButton searchButton = new JButton("Search");
     private final JButton refreshButton = new JButton("Refresh");
     private final JButton addButton = new JButton("Add");
     private final JButton editButton = new JButton("Edit");
@@ -37,10 +46,15 @@ public class MainWindow extends JFrame
     private final JList<News> newsList = new JList<>(listModel);
     private final NewsPanel newsPanel = new NewsPanel();
 
-    public MainWindow(NewsService newsService) 
+    // Shown at the bottom while the RSS feeds are being downloaded
+    private final JLabel statusLabel = new JLabel(" ");
+    private final JProgressBar progressBar = new JProgressBar();
+
+    public MainWindow(NewsService newsService, RssImporter rssImporter) 
     {
         super("News & Events Manager");
         this.newsService = newsService;
+        this.rssImporter = rssImporter;
 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1000, 650);
@@ -64,21 +78,98 @@ public class MainWindow extends JFrame
             }
         });
 
+        // Searching: pressing Enter in the field or clicking the button
+        searchField.addActionListener(event -> reloadNews());
+        searchButton.addActionListener(event -> reloadNews());
+
         // What the buttons do
         addButton.addActionListener(event -> addNews());
         editButton.addActionListener(event -> editNews());
         deleteButton.addActionListener(event -> deleteNews());
+        refreshButton.addActionListener(event -> refreshNews());
+        clearButton.addActionListener(event -> clearDatabase());
 
         // On start, show what is already saved in the database
         reloadNews();
+
+        // First start: the database is still empty, so download the news right away
+        if (listModel.isEmpty()) 
+        {
+            refreshNews();
+        }
+    }
+
+    // Downloads every RSS feed in the background and then reloads the list
+    private void refreshNews() 
+    {
+        setLoading(true);
+
+        SwingWorker<Integer, Void> worker = new SwingWorker<>() 
+        {
+            @Override
+            protected Integer doInBackground() 
+            {
+                // Runs on a background thread: the slow network work happens here
+                List<RssSource> sources = RssSourceLoader.load(RSS_CONFIG);
+                return rssImporter.importAll(sources);
+            }
+
+            @Override
+            protected void done() 
+            {
+                // Runs on the Swing thread again: only here may the window be updated
+                setLoading(false);
+                try 
+                {
+                    int newCount = get();
+                    reloadNews();
+                    String report = String.join("\n", rssImporter.getMessages());
+                    JOptionPane.showMessageDialog(MainWindow.this,
+                            "New news saved: " + newCount + "\n\n" + report,
+                            "Refresh finished", JOptionPane.INFORMATION_MESSAGE);
+                } catch (Exception hiba) 
+                {
+                    // get() wraps the real error, so show the original message
+                    Throwable cause = hiba;
+                    if (hiba.getCause() != null) 
+                    {
+                        cause = hiba.getCause();
+                    }
+                    showError("Refresh failed: " + cause.getMessage());
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    // Shows or hides the loading state and blocks the buttons while loading
+    private void setLoading(boolean loading)
+    {
+        progressBar.setVisible(loading);
+        if (loading) 
+        {
+            statusLabel.setText("Loading news... Please wait...");
+        } else
+        {
+            statusLabel.setText(" ");
+        }
+        refreshButton.setEnabled(!loading);
+        addButton.setEnabled(!loading);
+        clearButton.setEnabled(!loading);
+        searchField.setEnabled(!loading);
+        searchButton.setEnabled(!loading);
+        editButton.setEnabled(false);
+        deleteButton.setEnabled(false);
     }
 
     private void addNews() 
     {
         NewsForm form = new NewsForm(null);
         // Show the form again after an error, so the user does not lose what they typed
-        while (form.showDialog(this, "Add news")) {
-            try {
+        while (form.showDialog(this, "Add news")) 
+        {
+            try 
+            {
                 News news = new News(form.getTitleText(), form.getDescription(), form.getSource(),
                         form.getAuthor(), form.getPublisher(), form.getPublishDate(), form.getUrl(),
                         form.getLanguage(), form.getCoverImage(), null, null);
@@ -86,8 +177,9 @@ public class MainWindow extends JFrame
                 reloadNews();
                 selectNews(news);
                 return;
-            } catch (RuntimeException e) {
-                showError(e.getMessage());
+            } catch (RuntimeException hiba) 
+            {
+                showError(hiba.getMessage());
             }
         }
     }
@@ -96,17 +188,17 @@ public class MainWindow extends JFrame
     {
         News selected = newsList.getSelectedValue();
         NewsForm form = new NewsForm(selected);
-        while (form.showDialog(this, "Edit news")) 
+        while (form.showDialog(this, "Edit news"))
         {
-            try 
-            {
+            try {
                 newsService.editNews(selected, form.getTitleText(), form.getDescription(),
                         form.getAuthor(), form.getPublisher(), form.getLanguage(), form.getCoverImage());
                 reloadNews();
                 selectNews(selected);
                 return;
-            } catch (RuntimeException e) {
-                showError(e.getMessage());
+            } catch (RuntimeException hiba) 
+            {
+                showError(hiba.getMessage());
             }
         }
     }
@@ -117,11 +209,11 @@ public class MainWindow extends JFrame
         int answer = JOptionPane.showConfirmDialog(this,
                 "Delete this news item?\n" + selected.getTitle(),
                 "Delete news", JOptionPane.YES_NO_OPTION);
-        if (answer != JOptionPane.YES_OPTION) {
+        if (answer != JOptionPane.YES_OPTION) 
+        {
             return;
         }
-        try 
-        {
+        try {
             newsService.deleteNews(selected);
             reloadNews();
         } catch (RuntimeException hiba) {
@@ -129,12 +221,31 @@ public class MainWindow extends JFrame
         }
     }
 
-    // Loads every news item from the database into the list
+    private void clearDatabase() {
+        int answer = JOptionPane.showConfirmDialog(this,
+                "Delete ALL news from the database?\nThis cannot be undone.",
+                "Clear database", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (answer != JOptionPane.YES_OPTION) {
+            return;
+        }
+        try {
+            int deleted = newsService.clearAll();
+            reloadNews();
+            JOptionPane.showMessageDialog(this, deleted + " news items deleted.",
+                    "Clear database", JOptionPane.INFORMATION_MESSAGE);
+        } catch (RuntimeException hiba) 
+        {
+            showError(hiba.getMessage());
+        }
+    }
+
+    // Loads the news that match the search box (an empty box means every news item)
     private void reloadNews() 
     {
         try {
-            showInList(newsService.getAllNews());
-        } catch (RuntimeException hiba) {
+            showInList(newsService.search(searchField.getText()));
+        } catch (RuntimeException hiba) 
+        {
             showError(hiba.getMessage());
         }
     }
@@ -154,7 +265,8 @@ public class MainWindow extends JFrame
     // After reloading, the list contains new objects, so the item is found by its key
     private void selectNews(News news) 
     {
-        for (int i = 0; i < listModel.size(); i++) {
+        for (int i = 0; i < listModel.size(); i++) 
+        {
             News item = listModel.get(i);
             if (item.getSource().equals(news.getSource()) && item.getUrl().equals(news.getUrl())) 
             {
@@ -175,6 +287,7 @@ public class MainWindow extends JFrame
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         panel.add(new JLabel("Search:"));
         panel.add(searchField);
+        panel.add(searchButton);
         panel.add(refreshButton);
         return panel;
     }
@@ -195,6 +308,12 @@ public class MainWindow extends JFrame
         panel.add(editButton);
         panel.add(deleteButton);
         panel.add(clearButton);
+
+        // The animated bar only appears while loading
+        progressBar.setIndeterminate(true);
+        progressBar.setVisible(false);
+        panel.add(progressBar);
+        panel.add(statusLabel);
         return panel;
     }
 }

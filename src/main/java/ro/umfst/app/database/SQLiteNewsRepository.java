@@ -208,5 +208,14 @@ public class SQLiteNewsRepository implements NewsRepository {
         }
         return result;
     }
+    @Override
+    public int deleteAll() 
+    {
+        try (Statement statement = connection.createStatement()) {
+            return statement.executeUpdate("DELETE FROM news");
+        } catch (SQLException hiba) {
+            throw new RuntimeException("Could not clear the database: " + hiba.getMessage(), hiba);
+        }
+    }
     }
 

@@ -59,4 +59,9 @@ public class NewsService
         // If it was already deleted, the goal is reached anyway, so the result is not checked
         repository.delete(news.getSource(), news.getUrl());
     }
+    // Removes every news item from the database; returns how many were removed
+    public int clearAll() 
+    {
+        return repository.deleteAll();
+    }
 }
