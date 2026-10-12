@@ -56,36 +56,118 @@ public class MainWindow extends JFrame
         {
             if (!event.getValueIsAdjusting()) 
             {
-                newsPanel.showNews(newsList.getSelectedValue());
+                News selected = newsList.getSelectedValue();
+                newsPanel.showNews(selected);
+                // Edit and Delete only make sense when something is selected
+                editButton.setEnabled(selected != null);
+                deleteButton.setEnabled(selected != null);
             }
         });
+
+        // What the buttons do
+        addButton.addActionListener(event -> addNews());
+        editButton.addActionListener(event -> editNews());
+        deleteButton.addActionListener(event -> deleteNews());
 
         // On start, show what is already saved in the database
         reloadNews();
     }
 
+    private void addNews() 
+    {
+        NewsForm form = new NewsForm(null);
+        // Show the form again after an error, so the user does not lose what they typed
+        while (form.showDialog(this, "Add news")) {
+            try {
+                News news = new News(form.getTitleText(), form.getDescription(), form.getSource(),
+                        form.getAuthor(), form.getPublisher(), form.getPublishDate(), form.getUrl(),
+                        form.getLanguage(), form.getCoverImage(), null, null);
+                newsService.addNews(news);
+                reloadNews();
+                selectNews(news);
+                return;
+            } catch (RuntimeException e) {
+                showError(e.getMessage());
+            }
+        }
+    }
+
+    private void editNews() 
+    {
+        News selected = newsList.getSelectedValue();
+        NewsForm form = new NewsForm(selected);
+        while (form.showDialog(this, "Edit news")) 
+        {
+            try 
+            {
+                newsService.editNews(selected, form.getTitleText(), form.getDescription(),
+                        form.getAuthor(), form.getPublisher(), form.getLanguage(), form.getCoverImage());
+                reloadNews();
+                selectNews(selected);
+                return;
+            } catch (RuntimeException e) {
+                showError(e.getMessage());
+            }
+        }
+    }
+
+    private void deleteNews() 
+    {
+        News selected = newsList.getSelectedValue();
+        int answer = JOptionPane.showConfirmDialog(this,
+                "Delete this news item?\n" + selected.getTitle(),
+                "Delete news", JOptionPane.YES_NO_OPTION);
+        if (answer != JOptionPane.YES_OPTION) {
+            return;
+        }
+        try 
+        {
+            newsService.deleteNews(selected);
+            reloadNews();
+        } catch (RuntimeException hiba) {
+            showError(hiba.getMessage());
+        }
+    }
+
     // Loads every news item from the database into the list
     private void reloadNews() 
     {
-        try
-        {
+        try {
             showInList(newsService.getAllNews());
-        } catch (RuntimeException hiba) 
-        {
-            
-            JOptionPane.showMessageDialog(this, hiba.getMessage(), "Database error",
-                    JOptionPane.ERROR_MESSAGE);
+        } catch (RuntimeException hiba) {
+            showError(hiba.getMessage());
         }
     }
 
     private void showInList(List<News> newsItems) 
-            {
+    {
         listModel.clear();
         for (News news : newsItems) 
         {
             listModel.addElement(news);
         }
         newsPanel.showNews(null);
+        editButton.setEnabled(false);
+        deleteButton.setEnabled(false);
+    }
+
+    // After reloading, the list contains new objects, so the item is found by its key
+    private void selectNews(News news) 
+    {
+        for (int i = 0; i < listModel.size(); i++) {
+            News item = listModel.get(i);
+            if (item.getSource().equals(news.getSource()) && item.getUrl().equals(news.getUrl())) 
+            {
+                newsList.setSelectedIndex(i);
+                newsList.ensureIndexIsVisible(i);
+                return;
+            }
+        }
+    }
+
+    private void showError(String message) 
+    {
+        JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
     }
 
     private JPanel createTopBar() 
@@ -101,8 +183,8 @@ public class MainWindow extends JFrame
     {
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
                 new JScrollPane(newsList), newsPanel);
-        splitPane.setDividerLocation(330);   
-        splitPane.setResizeWeight(0.33);     
+        splitPane.setDividerLocation(330);   // about 1/3 of the 1000 pixel wide window
+        splitPane.setResizeWeight(0.33);     // keep the 1/3 - 2/3 ratio when the window is resized
         return splitPane;
     }
 
