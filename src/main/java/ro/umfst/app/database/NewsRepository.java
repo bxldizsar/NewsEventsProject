@@ -3,6 +3,7 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
 package ro.umfst.app.database;
+import java.util.List;
 import ro.umfst.app.model.News;
 
 /**
@@ -13,4 +14,13 @@ import ro.umfst.app.model.News;
 public interface NewsRepository {
     //save a new news item, returns false if a news item with the same source and url
     boolean add(News news);
+    
+    // Returns every stored news item, newest first
+    List<News> findAll();
+    
+    // Saves the changes of an existing news item; returns false if it is not in the storage
+    boolean update(News news);
+
+    // Deletes the news item with the given key; returns false if there was nothing to delete
+    boolean delete(String source, String url);
 }
