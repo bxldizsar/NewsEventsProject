@@ -172,6 +172,7 @@ public class SQLiteNewsRepository implements NewsRepository {
             throw new RuntimeException("Could not delete news: " + hiba.getMessage(), hiba);
         }
     }
+    //the save of a new "news" 
     @Override
     public List<News> search(String text) 
     {
@@ -208,6 +209,7 @@ public class SQLiteNewsRepository implements NewsRepository {
         }
         return result;
     }
+    
     @Override
     public int deleteAll() 
     {
