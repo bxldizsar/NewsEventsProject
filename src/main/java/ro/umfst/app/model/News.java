@@ -4,10 +4,11 @@ import java.sql.Timestamp;
 
 public class News extends ContentItem {
 
-    // Source and URL form the primary key of a news item, so they cannot change
+    // source and url form the primary key of a news item, they can't change
     private final String source;
     private final String url;
     private final Timestamp publishDate;
+    private boolean read = false;
 
     public News(String title, String description, String source, String author,
                 String publisher, Timestamp publishDate, String url, String language,
@@ -30,5 +31,13 @@ public class News extends ContentItem {
 
     public Timestamp getPublishDate() {
         return publishDate;
+    }
+    public boolean isRead()
+    {
+        return read;
+    }
+    public void markAsRead()
+    {
+        this.read = true;
     }
 }

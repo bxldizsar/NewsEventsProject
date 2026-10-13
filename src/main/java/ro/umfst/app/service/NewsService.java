@@ -56,12 +56,20 @@ public class NewsService
     }
 
     public void deleteNews(News news) {
-        // If it was already deleted, the goal is reached anyway, so the result is not checked
+        // if it was already deleted, the goal is reached anyway, so the result is not checked
         repository.delete(news.getSource(), news.getUrl());
     }
-    // Removes every news item from the database; returns how many were removed
+    // removes every news item from the database and returns how many were removed
     public int clearAll() 
     {
         return repository.deleteAll();
+    }
+     public void markAsRead(News news) {
+        //an item that is already read is not saved again
+        if (news.isRead()) {
+            return;
+        }
+        repository.markAsRead(news.getSource(), news.getUrl());
+        news.markAsRead();
     }
 }

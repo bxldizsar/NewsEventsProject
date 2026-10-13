@@ -42,6 +42,7 @@ public class SQLiteNewsRepository implements NewsRepository {
                     last_modified_date TIMESTAMP NOT NULL,
                     language TEXT NOT NULL,
                     cover_image TEXT,
+                    is_read INTEGER NOT NULL DEFAULT 0,
                     PRIMARY KEY (source, url)
                 )
                 """;
@@ -54,12 +55,42 @@ public class SQLiteNewsRepository implements NewsRepository {
         {
             throw new RuntimeException("Could not create the news table: " + hiba.getMessage(), hiba);
         }
+        addReadColumnIfMissing();
                       
+    }
+     private void addReadColumnIfMissing()
+    {
+        // PRAGMA table_info lists the columns of the table, one row per column
+        try (Statement statement = connection.createStatement();
+             ResultSet columns = statement.executeQuery("PRAGMA table_info(news)"))
+        {
+            while (columns.next())
+            {
+                if (columns.getString("name").equals("is_read"))
+                {
+                    return; // already there, nothing to do
+                }
+            }
+        }
+        catch (SQLException hiba)
+        {
+            throw new RuntimeException("Could not check the news table: " + hiba.getMessage(), hiba);
+        }
+
+        // not found -> add it, every existing row gets 0 (unread)
+        try (Statement statement = connection.createStatement())
+        {
+            statement.executeUpdate("ALTER TABLE news ADD COLUMN is_read INTEGER NOT NULL DEFAULT 0");
+        }
+        catch (SQLException hiba)
+        {
+            throw new RuntimeException("Could not add the is_read column: " + hiba.getMessage(), hiba);
+        }
     }
     @Override
     public boolean add(News news)
     {
-        //OR IGNORE: if the key (source + url) already exists, SQLite skips the row instead of failing
+        //or ignore: if the key source + urlalready exists, SQLite skips the row instead of failing
         String query = """
                 INSERT OR IGNORE INTO news (title, description, source, author, publisher,
                                             publish_date, url, creation_date, last_modified_date,
@@ -97,7 +128,7 @@ public class SQLiteNewsRepository implements NewsRepository {
         try (Statement statement = connection.createStatement();
             ResultSet rows = statement.executeQuery(query))
             {
-                // Move through the result one row at a time 
+                // move through the result one row at a time 
                 while (rows.next())
                 {
                     result.add(readNews(rows));
@@ -109,9 +140,10 @@ public class SQLiteNewsRepository implements NewsRepository {
                         }
                 return result;
             }
-             // Builds a News object from the row the ResultSet is currently on
-    private News readNews(ResultSet rows) throws SQLException {
-        return new News(
+             // builds a news object from the row, resultset is on
+    private News readNews(ResultSet rows) throws SQLException 
+    {
+       News news = new News(
                 rows.getString("title"),
                 rows.getString("description"),
                 rows.getString("source"),
@@ -123,11 +155,17 @@ public class SQLiteNewsRepository implements NewsRepository {
                 rows.getString("cover_image"),
                 rows.getTimestamp("creation_date"),
                 rows.getTimestamp("last_modified_date"));
+
+        // getBoolean turns the stored 1 into true and 0 into false
+        if (rows.getBoolean("is_read")) {
+            news.markAsRead();
+        }
+        return news;
     }
     
     @Override
     public boolean update(News news) {
-        // The key (source + url) finds the row; the other columns get the new values
+        // the key (source + url) finds the row, the other columns get the new values
         String query = """
                 UPDATE news
                 SET title = ?, description = ?, author = ?, publisher = ?,
@@ -187,7 +225,7 @@ public class SQLiteNewsRepository implements NewsRepository {
         {
             searchText = text.trim();
         }
-        // % means "any characters", so %dog% matches every text that contains "dog"
+       
         String pattern = "%" + searchText + "%";
 
         List<News> result = new ArrayList<>();
@@ -217,6 +255,39 @@ public class SQLiteNewsRepository implements NewsRepository {
             return statement.executeUpdate("DELETE FROM news");
         } catch (SQLException hiba) {
             throw new RuntimeException("Could not clear the database: " + hiba.getMessage(), hiba);
+        }
+    }
+    @Override
+    public boolean markAsRead(String source, String url) {
+        String query = "UPDATE news SET is_read = 1 WHERE source = ? AND url = ?";
+
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setString(1, source);
+            statement.setString(2, url);
+
+            int changedRows = statement.executeUpdate();
+            return changedRows == 1;
+        } catch (SQLException hiba) {
+            throw new RuntimeException("Could not mark news as read: " + hiba.getMessage(), hiba);
+        }
+    }
+     @Override
+    public boolean updateCoverImage(String source, String url, String coverImage)
+    {
+        String query = "UPDATE news SET cover_image = ? WHERE source = ? AND url = ?";
+
+        try (PreparedStatement statement = connection.prepareStatement(query))
+        {
+            statement.setString(1, coverImage);
+            statement.setString(2, source);
+            statement.setString(3, url);
+
+            int changedRows = statement.executeUpdate();
+            return changedRows == 1;
+        }
+        catch (SQLException hiba)
+        {
+            throw new RuntimeException("Could not save the cover image: " + hiba.getMessage(), hiba);
         }
     }
     }

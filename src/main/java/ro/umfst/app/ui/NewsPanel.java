@@ -96,6 +96,13 @@ public class NewsPanel extends JPanel
         // A missing or broken file gives a width of -1 instead of an error
         if (icon.getIconWidth() <= 0) 
         {
+            // broken picture -> try the default one instead
+            String defaultImage = CoverImageResolver.resolve(null);
+            if (!path.equals(defaultImage))
+            {
+                showImage(defaultImage);
+                return;
+            }
             imageLabel.setIcon(null);
             imageLabel.setText("(no image)");
             return;

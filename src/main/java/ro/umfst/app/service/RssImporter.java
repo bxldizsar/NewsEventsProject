@@ -8,6 +8,7 @@ import java.util.List;
 import ro.umfst.app.database.NewsRepository;
 import ro.umfst.app.model.News;
 import ro.umfst.app.network.HttpHelper;
+import ro.umfst.app.network.ImageDownloader;
 import ro.umfst.app.rss.RssReader;
 import ro.umfst.app.rss.RssSource;
 
@@ -54,6 +55,10 @@ public class RssImporter
                     if (repository.add(news)) 
                     {
                         savedFromSource++;
+                        // the feed had no picture -> look for it on the article page (only for new items)
+                        if (news.getCoverImage() == null) {
+                            addImageFromArticle(news);
+                        }
                     }
                 }
                 newCount += savedFromSource;
@@ -67,6 +72,14 @@ public class RssImporter
             }
         }
         return newCount;
+    }
+    // opens the article, finds its og:image, downloads it and saves the path to the db
+    private void addImageFromArticle(News news) {
+        String imageUrl = ImageDownloader.findArticleImage(news.getUrl());
+        String localPath = ImageDownloader.saveImage(imageUrl);
+        if (localPath != null) {
+            repository.updateCoverImage(news.getSource(), news.getUrl(), localPath);
+        }
     }
     public List<String> getMessages() 
     {
